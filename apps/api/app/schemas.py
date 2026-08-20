@@ -6,7 +6,7 @@ from __future__ import annotations
 import datetime as dt
 import uuid
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
 
 class OrmBase(BaseModel):
@@ -36,7 +36,15 @@ class Token(BaseModel):
 
 
 class WorkspaceCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("name")
+    @classmethod
+    def strip_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name cannot be blank")
+        return stripped
 
 
 class WorkspaceOut(OrmBase):
@@ -51,7 +59,7 @@ class WorkspaceOut(OrmBase):
 
 class DealCreate(BaseModel):
     workspace_id: uuid.UUID
-    company_name: str
+    company_name: str = Field(min_length=1, max_length=255)
     ticker: str | None = None
     exchange: str | None = None
     investment_type: str = "Public Equity"
@@ -64,6 +72,14 @@ class DealCreate(BaseModel):
     fiscal_year_end: str | None = None
     forecast_years: int = 5
     investment_thesis: str | None = None
+
+    @field_validator("company_name")
+    @classmethod
+    def strip_company_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("company_name cannot be blank")
+        return stripped
 
 
 class DealUpdate(BaseModel):
