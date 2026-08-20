@@ -16,6 +16,13 @@ class Settings(BaseSettings):
     default_forecast_years: int = 5
     terminal_value_threshold_pct: float = 0.75
     balance_sheet_tolerance_pct: float = 0.005
+    # Comma-separated list of allowed browser origins for the web frontend, e.g.
+    # "http://localhost:3000,https://valora-web-production.up.railway.app".
+    cors_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
 
 
 @lru_cache

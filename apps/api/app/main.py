@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.config import get_settings
 from app.routers import assumptions, auth, deals, documents, exports, financials, model_versions, workspaces
 
 app = FastAPI(
@@ -14,7 +15,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    # VALORA_CORS_ORIGINS (comma-separated) controls this in any deployed environment;
+    # defaults to the local Next.js dev server only.
+    allow_origins=get_settings().cors_origin_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

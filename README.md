@@ -64,6 +64,38 @@ npm install
 npm run dev
 ```
 
+## Deploying (e.g. Railway)
+
+This is a monorepo with two deployable apps and no buildable app at the repo root, so a
+platform's auto-detection (Railpack/Nixpacks/Buildpacks) will fail at the repo root — each app
+needs to be its own service with explicit build settings:
+
+**API service** (`apps/api`) — it imports the sibling `services/financial-engine` package, so it
+needs the *whole repo* as build context, not just `apps/api`. Use the Dockerfile build already set
+up for this:
+- Builder: **Dockerfile**
+- Dockerfile path: `infrastructure/docker/api.Dockerfile`
+- Root directory: **leave empty** (build context must stay the repo root — the Dockerfile's
+  `COPY services/financial-engine …` / `COPY apps/api …` lines depend on it)
+- Add a Postgres database to the project and set `VALORA_DATABASE_URL` to its connection string,
+  rewritten to the `postgresql+psycopg2://` scheme (Railway/most providers give you a bare
+  `postgresql://` URL — SQLAlchemy needs the driver in the scheme)
+- Set `VALORA_JWT_SECRET` to a real secret (not the `dev-secret-change-me` default)
+- Set `VALORA_CORS_ORIGINS` to the web service's public URL once it exists (comma-separated if
+  more than one, e.g. local + prod)
+- Note: `VALORA_STORAGE_DIR` (default `./storage`) is local container disk, which most PaaS
+  platforms wipe on every redeploy — fine for demoing the vertical slice, but uploaded source
+  documents and generated exports won't survive a redeploy until this is pointed at persistent
+  storage (a mounted volume, or the S3-compatible object storage the PRD calls for)
+
+**Web service** (`apps/web`) — self-contained, no Dockerfile needed:
+- Root directory: `apps/web`
+- Builder: auto-detected Node (from `package.json`)
+- Build command: default (`npm install && npm run build`); start command: default (`npm start`)
+- Set `NEXT_PUBLIC_API_BASE_URL` to the API service's public URL — **at build time**, since
+  Next.js inlines `NEXT_PUBLIC_*` vars when it builds, not at runtime. Changing it later requires
+  a rebuild, not just a restart.
+
 ## Tests
 
 ```bash

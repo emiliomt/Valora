@@ -42,6 +42,7 @@ services:
       VALORA_DATABASE_URL: postgresql+psycopg2://valora:valora@postgres:5432/valora
       VALORA_JWT_SECRET: dev-secret-change-me
       VALORA_STORAGE_DIR: /srv/storage
+      VALORA_CORS_ORIGINS: http://localhost:3000
     volumes:
       - api_storage:/srv/storage
     ports:
