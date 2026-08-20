@@ -1,0 +1,35 @@
+[project]
+name = "valora-api"
+version = "0.1.0"
+description = "FastAPI backend for the Investment Research & Valuation Platform"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.111",
+    "uvicorn[standard]>=0.30",
+    "sqlalchemy>=2.0",
+    "alembic>=1.13",
+    "psycopg2-binary>=2.9",
+    "pydantic[email]>=2.7",
+    "pydantic-settings>=2.3",
+    "python-jose[cryptography]>=3.3",
+    "passlib>=1.7",
+    "python-multipart>=0.0.9",
+    "pandas>=2.2",
+    "openpyxl>=3.1",
+]
+# Note: `financial-engine` (services/financial-engine) is a separate local package and is
+# installed alongside this one, e.g.:
+#   pip install -e ../../services/financial-engine -e .[dev]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "httpx>=0.27", "pytest-cov>=4.1"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

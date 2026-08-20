@@ -1,0 +1,19 @@
+[project]
+name = "financial-engine"
+version = "0.1.0"
+description = "Deterministic forecast, DCF, and sensitivity calculation engine for the Investment Research & Valuation Platform"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "pytest-cov>=4.1"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["financial_engine*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

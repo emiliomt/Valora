@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.coverage
+htmlcov/
+*.db
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+npm-debug.log*
+
+# Env
+.env
+.env.local
+*.local
+
+# Storage (local dev stand-in for S3-compatible object storage)
+apps/api/storage/
+
+# Editors / OS
+.DS_Store
+.vscode/
+.idea/
+apps/web/tsconfig.tsbuildinfo
