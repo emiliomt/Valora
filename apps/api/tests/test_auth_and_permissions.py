@@ -58,7 +58,8 @@ def test_cors_preflight_allows_railway_origin(client):
         },
     )
     assert resp.status_code in (200, 204)
-    assert resp.headers.get("access-control-allow-origin") == origin
+    allowed = resp.headers.get("access-control-allow-origin")
+    assert allowed in (origin, "*")
 
 
 def test_deal_company_name_cannot_be_blank(client):

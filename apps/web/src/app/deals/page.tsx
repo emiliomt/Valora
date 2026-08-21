@@ -27,6 +27,7 @@ export default function DealsPage() {
   const [loading, setLoading] = useState(true);
   const [creatingWorkspace, setCreatingWorkspace] = useState(false);
   const [creatingDeal, setCreatingDeal] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -83,12 +84,14 @@ export default function DealsPage() {
     if (creatingWorkspace) return;
     const name = newWorkspaceName.trim() || nextWorkspaceName(workspaces);
     setError(null);
+    setStatus(null);
     setCreatingWorkspace(true);
     try {
       const ws = await api.post<Workspace>("/api/workspaces", { name });
       setWorkspaces((prev) => [...prev, ws]);
       setActiveWorkspace(ws.id);
       setNewWorkspaceName("");
+      setStatus(`Created workspace “${ws.name}”.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create workspace");
     } finally {
@@ -144,12 +147,17 @@ export default function DealsPage() {
           {error}
         </p>
       )}
+      {status && !error && (
+        <p className="mb-4 rounded border border-[var(--good)]/40 bg-[var(--good)]/10 p-3 text-sm text-[var(--good)]">
+          {status}
+        </p>
+      )}
 
       <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <label className="text-sm text-[var(--muted)]">Workspace</label>
           <select
-            className="min-h-11 flex-1 rounded border border-[var(--border)] bg-transparent px-2 py-2 text-sm sm:flex-none"
+            className="min-h-11 min-w-[10rem] rounded border border-[var(--border)] bg-[var(--panel)] px-2 py-2 text-sm text-[var(--text)]"
             value={activeWorkspace ?? ""}
             onChange={(e) => setActiveWorkspace(e.target.value || null)}
           >
@@ -164,10 +172,19 @@ export default function DealsPage() {
               </option>
             ))}
           </select>
+          {activeWorkspace && (
+            <span className="text-sm font-medium">
+              {workspaces.find((w) => w.id === activeWorkspace)?.name}
+            </span>
+          )}
         </div>
-        <form onSubmit={createWorkspace} className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+        <form
+          onSubmit={createWorkspace}
+          method="dialog"
+          className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
+        >
           <input
-            className="min-h-11 w-full rounded border border-[var(--border)] bg-transparent px-3 py-2 text-sm sm:w-56"
+            className="min-h-11 w-full rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--text)] sm:w-56"
             placeholder="Name (optional)"
             value={newWorkspaceName}
             onChange={(e) => setNewWorkspaceName(e.target.value)}
