@@ -36,15 +36,15 @@ class Token(BaseModel):
 
 
 class WorkspaceCreate(BaseModel):
-    name: str = Field(min_length=1, max_length=255)
+    name: str | None = Field(default=None, max_length=255)
 
     @field_validator("name")
     @classmethod
-    def strip_name(cls, value: str) -> str:
+    def strip_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
         stripped = value.strip()
-        if not stripped:
-            raise ValueError("name cannot be blank")
-        return stripped
+        return stripped or None
 
 
 class WorkspaceOut(OrmBase):

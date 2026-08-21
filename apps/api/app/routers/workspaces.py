@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.db import get_db
 from app.deps import get_current_user
-from app.services.workspaces import provision_workspace
+from app.services.workspaces import next_default_workspace_name, provision_workspace
 
 router = APIRouter(prefix="/api/workspaces", tags=["workspaces"])
 
@@ -15,7 +15,7 @@ def create_workspace(
     db: Session = Depends(get_db),
     user: models.User = Depends(get_current_user),
 ):
-    workspace = provision_workspace(db, user, payload.name.strip())
+    workspace = provision_workspace(db, user, payload.name or next_default_workspace_name(db, user))
     db.commit()
     db.refresh(workspace)
     return workspace
