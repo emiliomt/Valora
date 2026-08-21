@@ -16,9 +16,12 @@ class Settings(BaseSettings):
     default_forecast_years: int = 5
     terminal_value_threshold_pct: float = 0.75
     balance_sheet_tolerance_pct: float = 0.005
-    # Comma-separated list of allowed browser origins for the web frontend, e.g.
-    # "http://localhost:3000,https://valora-web-production.up.railway.app".
-    cors_origins: str = "http://localhost:3000"
+    # Comma-separated list of allowed browser origins. Default * is safe because
+    # the API authenticates with Bearer tokens (not cookies); browsers will not
+    # send cross-site cookies. Override to a specific origin list if needed.
+    cors_origins: str = "*"
+    # Extra allowlist for Railway public hostnames when cors_origins is not *.
+    cors_origin_regex: str = r"https://.*\.up\.railway\.app"
 
     @property
     def cors_origin_list(self) -> list[str]:

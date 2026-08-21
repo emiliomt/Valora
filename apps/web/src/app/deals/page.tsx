@@ -6,6 +6,16 @@ import Link from "next/link";
 import { api, ApiError, clearToken, getToken } from "@/lib/api";
 import type { Deal, Workspace } from "@/lib/types";
 
+const DEFAULT_WORKSPACE_NAME = "Personal";
+
+function nextWorkspaceName(existing: Workspace[]): string {
+  const taken = new Set(existing.map((w) => w.name.toLowerCase()));
+  if (!taken.has(DEFAULT_WORKSPACE_NAME.toLowerCase())) return DEFAULT_WORKSPACE_NAME;
+  let index = 2;
+  while (taken.has(`workspace ${index}`)) index += 1;
+  return `Workspace ${index}`;
+}
+
 export default function DealsPage() {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -15,6 +25,9 @@ export default function DealsPage() {
   const [newDealName, setNewDealName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [creatingWorkspace, setCreatingWorkspace] = useState(false);
+  const [creatingDeal, setCreatingDeal] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -23,9 +36,15 @@ export default function DealsPage() {
     }
     (async () => {
       try {
-        const ws = await api.get<Workspace[]>("/api/workspaces");
+        let ws = await api.get<Workspace[]>("/api/workspaces");
+        // Accounts created before register auto-provisioned a workspace still land here
+        // with none. Create a default so the new-deal workflow is always available.
+        if (ws.length === 0) {
+          const created = await api.post<Workspace>("/api/workspaces", {});
+          ws = [created];
+        }
         setWorkspaces(ws);
-        if (ws.length > 0) setActiveWorkspace(ws[0].id);
+        setActiveWorkspace(ws[0].id);
       } catch (err) {
         if (err instanceof ApiError && err.status === 401) {
           clearToken();
@@ -47,28 +66,62 @@ export default function DealsPage() {
       .catch((err) => setError(err instanceof Error ? err.message : "Failed to load deals"));
   }, [activeWorkspace]);
 
-  async function createWorkspace(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newWorkspaceName.trim()) return;
-    const ws = await api.post<Workspace>("/api/workspaces", { name: newWorkspaceName });
-    setWorkspaces((prev) => [...prev, ws]);
-    setActiveWorkspace(ws.id);
-    setNewWorkspaceName("");
+  async function ensureWorkspace(): Promise<string | null> {
+    if (activeWorkspace) return activeWorkspace;
+    try {
+      const created = await api.post<Workspace>("/api/workspaces", {});
+      setWorkspaces((prev) => (prev.some((w) => w.id === created.id) ? prev : [...prev, created]));
+      setActiveWorkspace(created.id);
+      return created.id;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create workspace");
+      return null;
+    }
+  }
+
+  async function createWorkspace(e?: React.FormEvent | React.MouseEvent) {
+    e?.preventDefault();
+    if (creatingWorkspace) return;
+    const name = newWorkspaceName.trim() || nextWorkspaceName(workspaces);
+    setError(null);
+    setStatus(null);
+    setCreatingWorkspace(true);
+    try {
+      const ws = await api.post<Workspace>("/api/workspaces", { name });
+      setWorkspaces((prev) => [...prev, ws]);
+      setActiveWorkspace(ws.id);
+      setNewWorkspaceName("");
+      setStatus(`Created workspace “${ws.name}”.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create workspace");
+    } finally {
+      setCreatingWorkspace(false);
+    }
   }
 
   async function createDeal(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeWorkspace || !newDealName.trim()) return;
+    const companyName = newDealName.trim();
+    if (!companyName) {
+      setError("Enter a company name to start a deal.");
+      return;
+    }
+    setError(null);
+    setCreatingDeal(true);
     try {
+      const workspaceId = await ensureWorkspace();
+      if (!workspaceId) return;
       const deal = await api.post<Deal>("/api/deals", {
-        workspace_id: activeWorkspace,
-        company_name: newDealName,
+        workspace_id: workspaceId,
+        company_name: companyName,
       });
       setDeals((prev) => [...prev, deal]);
       setNewDealName("");
       router.push(`/deals/${deal.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create deal");
+    } finally {
+      setCreatingDeal(false);
     }
   }
 
@@ -89,50 +142,88 @@ export default function DealsPage() {
         </button>
       </div>
 
-      {error && <p className="mb-4 text-sm text-[var(--bad)]">{error}</p>}
+      {error && (
+        <p className="mb-4 rounded border border-[var(--bad)]/40 bg-[var(--bad)]/10 p-3 text-sm text-[var(--bad)]">
+          {error}
+        </p>
+      )}
+      {status && !error && (
+        <p className="mb-4 rounded border border-[var(--good)]/40 bg-[var(--good)]/10 p-3 text-sm text-[var(--good)]">
+          {status}
+        </p>
+      )}
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <label className="text-sm text-[var(--muted)]">Workspace</label>
-        <select
-          className="rounded border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
-          value={activeWorkspace ?? ""}
-          onChange={(e) => setActiveWorkspace(e.target.value)}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-[var(--muted)]">Workspace</label>
+          <select
+            className="min-h-11 min-w-[10rem] rounded border border-[var(--border)] bg-[var(--panel)] px-2 py-2 text-sm text-[var(--text)]"
+            value={activeWorkspace ?? ""}
+            onChange={(e) => setActiveWorkspace(e.target.value || null)}
+          >
+            {workspaces.length === 0 && (
+              <option value="" className="bg-[var(--panel)]">
+                No workspace yet
+              </option>
+            )}
+            {workspaces.map((w) => (
+              <option key={w.id} value={w.id} className="bg-[var(--panel)]">
+                {w.name}
+              </option>
+            ))}
+          </select>
+          {activeWorkspace && (
+            <span className="text-sm font-medium">
+              {workspaces.find((w) => w.id === activeWorkspace)?.name}
+            </span>
+          )}
+        </div>
+        <form
+          onSubmit={createWorkspace}
+          method="dialog"
+          className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:items-center"
         >
-          {workspaces.map((w) => (
-            <option key={w.id} value={w.id} className="bg-[var(--panel)]">
-              {w.name}
-            </option>
-          ))}
-        </select>
-        <form onSubmit={createWorkspace} className="flex items-center gap-2">
           <input
-            className="rounded border border-[var(--border)] bg-transparent px-2 py-1 text-sm"
-            placeholder="New workspace name"
+            className="min-h-11 w-full rounded border border-[var(--border)] bg-[var(--panel)] px-3 py-2 text-sm text-[var(--text)] sm:w-56"
+            placeholder="Name (optional)"
             value={newWorkspaceName}
             onChange={(e) => setNewWorkspaceName(e.target.value)}
+            aria-label="New workspace name"
           />
-          <button className="rounded border border-[var(--border)] px-2 py-1 text-sm" type="submit">
-            + Workspace
+          <button
+            className="min-h-11 w-full rounded bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
+            type="button"
+            onClick={createWorkspace}
+            disabled={creatingWorkspace}
+          >
+            {creatingWorkspace ? "Creating…" : "+ Workspace"}
           </button>
         </form>
       </div>
 
-      {activeWorkspace && (
-        <form onSubmit={createDeal} className="card mb-6 flex items-center gap-3 p-4">
-          <input
-            className="flex-1 rounded border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
-            placeholder="Company name (e.g. Acme Corp)"
-            value={newDealName}
-            onChange={(e) => setNewDealName(e.target.value)}
-          />
-          <button className="rounded bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white" type="submit">
-            Create deal
-          </button>
-        </form>
-      )}
+      <form onSubmit={createDeal} className="card mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+        <input
+          className="min-h-11 w-full flex-1 rounded border border-[var(--border)] bg-transparent px-3 py-2 text-sm"
+          placeholder="Company name (e.g. Acme Corp)"
+          value={newDealName}
+          onChange={(e) => setNewDealName(e.target.value)}
+        />
+        <button
+          className="min-h-11 w-full rounded bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white disabled:opacity-60 sm:w-auto"
+          type="submit"
+          disabled={creatingDeal}
+        >
+          {creatingDeal ? "Creating…" : "Create deal"}
+        </button>
+      </form>
 
       <div className="card divide-y divide-[var(--border)]">
-        {deals.length === 0 && <p className="p-4 text-sm text-[var(--muted)]">No deals yet in this workspace.</p>}
+        {deals.length === 0 && (
+          <p className="p-4 text-sm text-[var(--muted)]">
+            No deals yet in this workspace. Enter a company name above and tap{" "}
+            <span className="text-[var(--text)]">Create deal</span> to start a valuation workflow.
+          </p>
+        )}
         {deals.map((deal) => (
           <Link
             key={deal.id}

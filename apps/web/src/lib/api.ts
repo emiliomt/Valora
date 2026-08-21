@@ -1,4 +1,3 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 const TOKEN_KEY = "valora_token";
 
 export class ApiError extends Error {
@@ -7,6 +6,13 @@ export class ApiError extends Error {
     super(message);
     this.status = status;
   }
+}
+
+function apiOrigin(): string {
+  // In the browser, always call same-origin /api/* so Next.js can proxy to the
+  // FastAPI service. That avoids CORS and a localhost API URL baked into the client.
+  if (typeof window !== "undefined") return window.location.origin;
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
 }
 
 export function getToken(): string | null {
@@ -22,17 +28,22 @@ export function clearToken() {
   window.localStorage.removeItem(TOKEN_KEY);
 }
 
-async function request<T>(
-  path: string,
-  options: RequestInit & { params?: Record<string, string | number | undefined> } = {}
-): Promise<T> {
-  const { params, ...init } = options;
-  const url = new URL(`${API_BASE}${path}`);
+function makeUrl(path: string, params?: Record<string, string | number | undefined>): URL {
+  const url = new URL(path, apiOrigin());
   if (params) {
     for (const [k, v] of Object.entries(params)) {
       if (v !== undefined) url.searchParams.set(k, String(v));
     }
   }
+  return url;
+}
+
+async function request<T>(
+  path: string,
+  options: RequestInit & { params?: Record<string, string | number | undefined> } = {}
+): Promise<T> {
+  const { params, ...init } = options;
+  const url = makeUrl(path, params);
 
   const headers = new Headers(init.headers);
   const token = getToken();
@@ -41,7 +52,13 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(url.toString(), { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { ...init, headers });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "Request failed";
+    throw new ApiError(0, `Cannot reach API (${reason}).`);
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -75,10 +92,14 @@ export const api = {
     const form = new URLSearchParams();
     form.set("username", email);
     form.set("password", password);
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const url = makeUrl("/api/auth/login");
+    const res = await fetch(url.toString(), {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString(),
+    }).catch((err: unknown) => {
+      const reason = err instanceof Error ? err.message : "Request failed";
+      throw new ApiError(0, `Cannot reach API (${reason}).`);
     });
     if (!res.ok) throw new ApiError(res.status, "Invalid email or password");
     return (await res.json()) as { access_token: string; token_type: string };

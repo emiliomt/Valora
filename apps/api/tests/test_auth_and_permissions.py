@@ -5,6 +5,74 @@ def _register_and_login(client, email):
     return {"Authorization": f"Bearer {token}"}
 
 
+def test_register_provisions_personal_workspace(client):
+    resp = client.post(
+        "/api/auth/register",
+        json={"email": "newuser@example.com", "name": "New", "password": "supersecret1"},
+    )
+    assert resp.status_code == 201
+    login = client.post("/api/auth/login", data={"username": "newuser@example.com", "password": "supersecret1"})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+    workspaces = client.get("/api/workspaces", headers=headers)
+    assert workspaces.status_code == 200
+    names = [w["name"] for w in workspaces.json()]
+    assert "Personal" in names
+
+
+def test_new_user_can_create_deal_without_manual_workspace(client):
+    """The create-deal workflow must work immediately after signup — no extra workspace step."""
+    headers = _register_and_login(client, "workflow@example.com")
+    ws = client.get("/api/workspaces", headers=headers).json()
+    assert len(ws) >= 1
+    resp = client.post(
+        "/api/deals",
+        json={"workspace_id": ws[0]["id"], "company_name": "Acme Corp"},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+    assert resp.json()["company_name"] == "Acme Corp"
+
+
+def test_blank_workspace_name_uses_next_default(client):
+    headers = _register_and_login(client, "blank-ws@example.com")
+    resp = client.post("/api/workspaces", json={"name": ""}, headers=headers)
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Workspace 2"
+
+
+def test_omitted_workspace_name_uses_next_default(client):
+    headers = _register_and_login(client, "omit-ws@example.com")
+    resp = client.post("/api/workspaces", json={}, headers=headers)
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Workspace 2"
+
+
+def test_cors_preflight_allows_railway_origin(client):
+    origin = "https://valora-web-production-06cc3.up.railway.app"
+    resp = client.options(
+        "/api/workspaces",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert resp.status_code in (200, 204)
+    allowed = resp.headers.get("access-control-allow-origin")
+    assert allowed in (origin, "*")
+
+
+def test_deal_company_name_cannot_be_blank(client):
+    headers = _register_and_login(client, "blank-deal@example.com")
+    ws = client.get("/api/workspaces", headers=headers).json()[0]
+    resp = client.post(
+        "/api/deals",
+        json={"workspace_id": ws["id"], "company_name": ""},
+        headers=headers,
+    )
+    assert resp.status_code == 422
+
+
 def test_login_rejects_wrong_password(client):
     client.post("/api/auth/register", json={"email": "a@example.com", "name": "A", "password": "supersecret1"})
     resp = client.post("/api/auth/login", data={"username": "a@example.com", "password": "wrong"})
