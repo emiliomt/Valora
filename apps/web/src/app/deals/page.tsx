@@ -49,16 +49,33 @@ export default function DealsPage() {
 
   async function createWorkspace(e: React.FormEvent) {
     e.preventDefault();
-    if (!newWorkspaceName.trim()) return;
-    const ws = await api.post<Workspace>("/api/workspaces", { name: newWorkspaceName });
-    setWorkspaces((prev) => [...prev, ws]);
-    setActiveWorkspace(ws.id);
-    setNewWorkspaceName("");
+    setError(null);
+    if (!newWorkspaceName.trim()) {
+      setError("Enter a workspace name first.");
+      return;
+    }
+    try {
+      const ws = await api.post<Workspace>("/api/workspaces", { name: newWorkspaceName });
+      setWorkspaces((prev) => [...prev, ws]);
+      setActiveWorkspace(ws.id);
+      setNewWorkspaceName("");
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken();
+        router.replace("/login");
+        return;
+      }
+      setError(err instanceof Error ? err.message : "Failed to create workspace");
+    }
   }
 
   async function createDeal(e: React.FormEvent) {
     e.preventDefault();
-    if (!activeWorkspace || !newDealName.trim()) return;
+    setError(null);
+    if (!activeWorkspace || !newDealName.trim()) {
+      setError("Enter a company name first.");
+      return;
+    }
     try {
       const deal = await api.post<Deal>("/api/deals", {
         workspace_id: activeWorkspace,
@@ -68,6 +85,11 @@ export default function DealsPage() {
       setNewDealName("");
       router.push(`/deals/${deal.id}`);
     } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        clearToken();
+        router.replace("/login");
+        return;
+      }
       setError(err instanceof Error ? err.message : "Failed to create deal");
     }
   }
