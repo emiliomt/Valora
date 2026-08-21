@@ -33,10 +33,32 @@ def test_new_user_can_create_deal_without_manual_workspace(client):
     assert resp.json()["company_name"] == "Acme Corp"
 
 
-def test_workspace_name_cannot_be_blank(client):
+def test_blank_workspace_name_uses_next_default(client):
     headers = _register_and_login(client, "blank-ws@example.com")
     resp = client.post("/api/workspaces", json={"name": ""}, headers=headers)
-    assert resp.status_code == 422
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Workspace 2"
+
+
+def test_omitted_workspace_name_uses_next_default(client):
+    headers = _register_and_login(client, "omit-ws@example.com")
+    resp = client.post("/api/workspaces", json={}, headers=headers)
+    assert resp.status_code == 201
+    assert resp.json()["name"] == "Workspace 2"
+
+
+def test_cors_preflight_allows_railway_origin(client):
+    origin = "https://valora-web-production-06cc3.up.railway.app"
+    resp = client.options(
+        "/api/workspaces",
+        headers={
+            "Origin": origin,
+            "Access-Control-Request-Method": "POST",
+            "Access-Control-Request-Headers": "authorization,content-type",
+        },
+    )
+    assert resp.status_code in (200, 204)
+    assert resp.headers.get("access-control-allow-origin") == origin
 
 
 def test_deal_company_name_cannot_be_blank(client):

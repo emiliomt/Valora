@@ -16,8 +16,10 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     # VALORA_CORS_ORIGINS (comma-separated) controls this in any deployed environment;
-    # defaults to the local Next.js dev server only.
+    # defaults to the local Next.js dev server only. VALORA_CORS_ORIGIN_REGEX additionally
+    # allows Railway's public hostnames so a new web URL does not silently break POSTs.
     allow_origins=get_settings().cors_origin_list,
+    allow_origin_regex=get_settings().cors_origin_regex or None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
