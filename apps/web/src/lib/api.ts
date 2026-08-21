@@ -41,7 +41,13 @@ async function request<T>(
     headers.set("Content-Type", "application/json");
   }
 
-  const res = await fetch(url.toString(), { ...init, headers });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), { ...init, headers });
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : "Request failed";
+    throw new ApiError(0, `Cannot reach API at ${url.origin} (${reason}).`);
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -79,6 +85,9 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: form.toString(),
+    }).catch((err: unknown) => {
+      const reason = err instanceof Error ? err.message : "Request failed";
+      throw new ApiError(0, `Cannot reach API at ${API_BASE} (${reason}).`);
     });
     if (!res.ok) throw new ApiError(res.status, "Invalid email or password");
     return (await res.json()) as { access_token: string; token_type: string };

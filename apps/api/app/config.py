@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed browser origins for the web frontend, e.g.
     # "http://localhost:3000,https://valora-web-production.up.railway.app".
     cors_origins: str = "http://localhost:3000"
+    # Railway public URLs change per deploy (…-production-06cc3.up.railway.app). A regex
+    # keeps CORS working when VALORA_CORS_ORIGINS hasn't been updated yet.
+    cors_origin_regex: str = r"https://.*\.up\.railway\.app"
 
     @property
     def cors_origin_list(self) -> list[str]:
